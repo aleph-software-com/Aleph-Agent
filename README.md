@@ -9,8 +9,8 @@ Open-source platform to build, configure, and deploy AI agents and pipelines wit
 ### 1. Clone the repository
 
 ```bash
-git clone <repo-url>
-cd alephAgent
+git clone https://github.com/aleph-software-com/Aleph-Agent.git
+cd Aleph-Agent
 ```
 
 ### 2. Configure environment
