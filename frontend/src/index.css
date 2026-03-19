@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* ── Fonds — gris foncé teinté bleu roi ── */
+    --bg-dark: #0e1118;
+    --bg: #141820;
+    --bg-light: #1c212b;
+
+    /* ── Texte — crème clair (opposé du bleu foncé light) ── */
+    --text: #f5f0e8;
+    --text-muted: #e8e2d8;
+    --text-dim: #c4baa8;
+
+    /* ── Accents ── */
+    --accent: #f5f0e8;
+    --accent-hover: #e8e2d8;
+
+    /* ── Bordures ── */
+    --border: #1e2d48;
+    --border-muted: #243654;
+    --edge-stroke: #3a5278;
+
+    /* ── Overlays ── */
+    --overlay: rgba(7, 14, 28, 0.92);
+    --overlay-light: rgba(245, 240, 232, 0.04);
+
+    /* ── Utilitaires — versions claires des couleurs profondes du light ── */
+    --highlight: #b8c4d4;
+    --primary: #a8c4eb;
+    --primary-hover: rgba(168, 196, 235, 0.1);
+    --secondary: #f08aac;
+    --secondary-hover: rgba(240, 138, 172, 0.1);
+    --danger: #f06060;
+    --warning: #f0b840;
+    --success: #3dd4a0;
+    --info: #a8c4eb;
+    --code: #6ba3f0;
+
+    /* ── Semantic concept colors ── */
+    --c-agent: #a78bfa;       /* Violet */
+    --c-pipeline: #a78bfa;    /* Violet */
+    --c-prompt: #a78bfa;      /* Violet */
+    --c-task: #60a5fa;        /* Blue */
+    --c-tools: #fb923c;       /* Orange */
+    --c-context: #34d399;     /* Green */
+    --c-condition: #f472b6;   /* Pink */
+    --c-user: #fbbf24;        /* Yellow */
+  }
+
+  [data-theme="light"] {
+    /* ── Fonds — crème blanc ── */
+    --bg-dark: #f0ebe3;
+    --bg: #f8f4ee;
+    --bg-light: #fffcf7;
+
+    /* ── Texte — même bleu foncé que le dark mode ── */
+    --text: #0a1628;
+    --text-muted: #0f1e36;
+    --text-dim: #162a4a;
+
+    /* ── Accents ── */
+    --accent: #0a1628;
+    --accent-hover: #0f1e36;
+
+    /* ── Bordures ── */
+    --border: #e0d9cf;
+    --border-muted: #e8e2d8;
+    --edge-stroke: #b8ad9e;
+
+    /* ── Overlays ── */
+    --overlay: rgba(255, 255, 255, 0.92);
+    --overlay-light: rgba(10, 22, 40, 0.04);
+
+    /* ── Utilitaires ── */
+    --highlight: #162a4a;
+    --primary: #0f1e36;
+    --primary-hover: rgba(15, 30, 54, 0.1);
+    --secondary: #db2777;
+    --secondary-hover: rgba(219, 39, 119, 0.1);
+    --danger: #dc2626;
+    --warning: #d97706;
+    --success: #059669;
+    --info: #0f1e36;
+    --code: #2563eb;
+
+    /* ── Semantic concept colors — identiques au dark mode ── */
+    --c-agent: #a78bfa;
+    --c-pipeline: #a78bfa;
+    --c-prompt: #a78bfa;
+    --c-task: #60a5fa;
+    --c-tools: #fb923c;
+    --c-context: #34d399;
+    --c-condition: #f472b6;
+    --c-user: #fbbf24;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+  }
+
+  #root {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+
+  input, textarea, select {
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg-light);
+    border: 1px solid var(--border-muted);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--primary);
+    outline: none;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: var(--text-dim);
+  }
+
+  .chat-textarea {
+    background: transparent !important;
+    border: none !important;
+    padding: 16px 52px 16px 20px !important;
+    border-radius: 0 !important;
+    font-size: inherit !important;
+    transition: none !important;
+  }
+  .chat-textarea:focus {
+    border: none !important;
+    outline: none !important;
+  }
+  .chat-textarea::-webkit-scrollbar {
+    display: none;
+  }
+}
