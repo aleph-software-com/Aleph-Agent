@@ -4,7 +4,7 @@ import { Handle, Position, useUpdateNodeInternals, type NodeTypes } from '@xyflo
 import { FiFlag, FiArrowRight, FiChevronDown } from 'react-icons/fi'
 import { RiRobot3Line } from 'react-icons/ri'
 import { LuWrench } from 'react-icons/lu'
-import type { AgentDef, PipelineAgentNodeData, PipelineToolNodeData } from './types'
+import type { AgentDef, AgentVersionDef, PipelineAgentNodeData, PipelineToolNodeData } from './types'
 
 function getPortalRoot() {
   return document.getElementById('portal-root') || document.body
@@ -40,9 +40,11 @@ function PipelineStartNode() {
 
 function PipelineAgentNode({ id, data, selected }: { id: string; data: PipelineAgentNodeData; selected?: boolean }) {
   const [open, setOpen] = useState(false)
+  const [versionOpen, setVersionOpen] = useState(false)
   const updateNodeInternals = useUpdateNodeInternals()
   const handoffs = data.handoffs || []
   const agents = data.agents || []
+  const versions = data.versions || []
   const isChosen = !!data.agentId
 
   const handoffKeys = handoffs.map((h) => h.toolName).join(',')
@@ -63,40 +65,85 @@ function PipelineAgentNode({ id, data, selected }: { id: string; data: PipelineA
         <span className="text-[8px] font-semibold uppercase tracking-wider" style={{ color: 'var(--highlight)' }}>Agent</span>
       </div>
 
-      {/* Agent selector */}
-      <div className="px-1.5 py-1.5 relative" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={() => setOpen(!open)}
-          className="w-full flex items-center justify-between px-2 py-1.5 rounded cursor-pointer"
-          style={{
-            background: 'var(--bg-light)',
-            border: `1px solid ${isChosen ? 'var(--border-muted)' : 'var(--border)'}`,
-            color: isChosen ? 'var(--text)' : 'var(--highlight)',
-          }}
-        >
-          <span className="text-[10px] font-semibold truncate">{data.label}</span>
-          <FiChevronDown size={9} style={{ color: 'var(--highlight)', flexShrink: 0 }} />
-        </button>
-        {open && agents.length > 0 && (
-          <div
-            className="absolute left-1.5 right-1.5 mt-1 rounded-md overflow-hidden z-50 py-0.5"
-            style={{ background: 'var(--bg)', border: '1px solid var(--border-muted)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+      {/* Agent + Version selectors */}
+      <div className="px-1.5 py-1.5 flex gap-1 relative" onClick={(e) => e.stopPropagation()}>
+        {/* Agent selector */}
+        <div className="flex-1 min-w-0 relative">
+          <button
+            onClick={() => { setOpen(!open); setVersionOpen(false) }}
+            className="w-full flex items-center justify-between px-2 py-1.5 rounded cursor-pointer"
+            style={{
+              background: 'var(--bg-light)',
+              border: `1px solid ${isChosen ? 'var(--border-muted)' : 'var(--border)'}`,
+              color: isChosen ? 'var(--text)' : 'var(--highlight)',
+            }}
           >
-            {agents.map((agent) => (
-              <button
-                key={agent.id}
-                onClick={() => { data.onSelect?.(agent); setOpen(false) }}
-                className="w-full text-left px-2.5 py-2 text-[10px] font-medium cursor-pointer transition-colors duration-100 flex items-center justify-between"
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-light)'; e.currentTarget.style.color = 'var(--text)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}
+            <span className="text-[10px] font-semibold truncate">{data.label}</span>
+            <FiChevronDown size={9} style={{ color: 'var(--highlight)', flexShrink: 0 }} />
+          </button>
+          {open && agents.length > 0 && (
+            <div
+              className="absolute left-0 right-0 mt-1 rounded-md overflow-hidden z-50 py-0.5"
+              style={{ background: 'var(--bg)', border: '1px solid var(--border-muted)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+            >
+              {agents.map((agent) => (
+                <button
+                  key={agent.id}
+                  onClick={() => { data.onSelect?.(agent); setOpen(false) }}
+                  className="w-full text-left px-2.5 py-2 text-[10px] font-medium cursor-pointer transition-colors duration-100 flex items-center justify-between"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-light)'; e.currentTarget.style.color = 'var(--text)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}
+                >
+                  <span>{agent.name}</span>
+                  {agent.handoffs.length > 0 && (
+                    <span className="text-[8px]" style={{ color: 'var(--highlight)' }}>{agent.handoffs.length}h</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Version selector */}
+        {isChosen && (
+          <div className="relative" style={{ width: 52 }}>
+            <button
+              onClick={() => { setVersionOpen(!versionOpen); setOpen(false) }}
+              className="w-full flex items-center justify-between px-1.5 py-1.5 rounded cursor-pointer"
+              style={{
+                background: 'var(--bg-light)',
+                border: '1px solid var(--border-muted)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <span className="text-[9px] font-semibold truncate">{data.versionLabel || `v${data.agentVersion ?? '?'}`}</span>
+              <FiChevronDown size={8} style={{ color: 'var(--highlight)', flexShrink: 0 }} />
+            </button>
+            {versionOpen && versions.length > 0 && (
+              <div
+                className="absolute left-0 mt-1 rounded-md overflow-hidden z-50 py-0.5"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border-muted)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 80 }}
               >
-                <span>{agent.name}</span>
-                {agent.handoffs.length > 0 && (
-                  <span className="text-[8px]" style={{ color: 'var(--highlight)' }}>{agent.handoffs.length}h</span>
-                )}
-              </button>
-            ))}
+                {versions.map((v) => (
+                  <button
+                    key={v.version}
+                    onClick={() => { data.onVersionSelect?.(v.version, v.label || `v${v.version}`); setVersionOpen(false) }}
+                    className="w-full text-left px-2.5 py-2 text-[10px] font-medium cursor-pointer transition-colors duration-100 flex items-center justify-between gap-2"
+                    style={{
+                      background: v.version === data.agentVersion ? 'var(--bg-light)' : 'transparent',
+                      border: 'none',
+                      color: v.version === data.agentVersion ? 'var(--text)' : 'var(--text-muted)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-light)'; e.currentTarget.style.color = 'var(--text)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = v.version === data.agentVersion ? 'var(--bg-light)' : 'transparent'; e.currentTarget.style.color = v.version === data.agentVersion ? 'var(--text)' : 'var(--text-muted)' }}
+                  >
+                    <span>v{v.version}</span>
+                    {v.label && <span className="text-[8px] truncate" style={{ color: 'var(--highlight)' }}>{v.label}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

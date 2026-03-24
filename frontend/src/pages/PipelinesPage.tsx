@@ -62,6 +62,13 @@ export default function PipelinesPage() {
 
   useEffect(() => { loadPipelines() }, [loadPipelines])
 
+  // Auto-select first pipeline if none selected
+  useEffect(() => {
+    if (!id && pipelinesList.length > 0) {
+      navigate(`/pipelines/${pipelinesList[0].id}`, { replace: true })
+    }
+  }, [id, pipelinesList, navigate])
+
   useEffect(() => {
     if (!id) { setPipelineFull(null); return }
     api.pipelines.getFull(id).then(setPipelineFull).catch(() => setPipelineFull(null))

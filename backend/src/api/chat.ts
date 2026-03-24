@@ -7,6 +7,7 @@ import {
   initSSE, sendEvent,
   resolveCanvasOwnership,
   resolveEntryAgent,
+  resolveAgentVersion,
   runAgentLoop,
   type ChatMessage, type EngineContext, type EngineEmitter,
 } from '../engine/index.js';
@@ -22,6 +23,7 @@ const now = () => new Date().toISOString();
 
 interface AgentContextInput {
   agentId: string;
+  agentVersionOverride?: number | null;  // pin to specific version from pipeline flow
   session: any;
   restoredHistory: any[];
   contextSummary: string | null;
@@ -39,7 +41,8 @@ async function buildAgentContext(input: AgentContextInput): Promise<{ ctx: Engin
   const agent = await agentsQ.findById(input.agentId);
   if (!agent) return { error: `Agent ${input.agentId} introuvable` };
 
-  const version = await agentsQ.findVersion(agent.id, agent.current_version);
+  const versionNum = input.agentVersionOverride ?? agent.current_version;
+  const version = await agentsQ.findVersion(agent.id, versionNum);
   const snapshot = version?.snapshot ?? {};
   const agentFull: any = { ...agent, ...snapshot };
 
@@ -197,19 +200,22 @@ router.post('/pipelines/:pipelineId/chat', async (req, res) => {
     // Session
     let session = session_id ? sessionsQ.findById(session_id) : null;
     let currentAgentId: string;
+    let currentAgentVersion: number | null = null;
 
     if (!session) {
-      const entryAgentId = resolveEntryAgent(pipelineFull.flow_data);
-      if (!entryAgentId) {
+      const entry = resolveEntryAgent(pipelineFull.flow_data);
+      if (!entry) {
         sendEvent(res, 'error', { error: 'Aucun agent d\'entrée trouvé dans le pipeline' });
         sendEvent(res, 'done', {});
         res.end();
         return;
       }
-      session = sessionsQ.createPipeline(pipelineId, entryAgentId);
-      currentAgentId = entryAgentId;
+      session = sessionsQ.createPipeline(pipelineId, entry.agentId);
+      currentAgentId = entry.agentId;
+      currentAgentVersion = entry.agentVersion;
     } else {
       currentAgentId = session.current_agent_id || session.agent_id;
+      currentAgentVersion = resolveAgentVersion(pipelineFull.flow_data, currentAgentId);
     }
 
     sendEvent(res, 'session', { id: session.id });
@@ -221,6 +227,7 @@ router.post('/pipelines/:pipelineId/chat', async (req, res) => {
     try {
       session = sessionsQ.findById(session.id)!;
       currentAgentId = session.current_agent_id || session.agent_id;
+      currentAgentVersion = resolveAgentVersion(pipelineFull.flow_data, currentAgentId);
 
       let runtimeVariables: Record<string, any> = session.runtime_variables ? { ...session.runtime_variables } : {};
       let restoredHistory: any[] = session.message_history || [];
@@ -238,6 +245,7 @@ router.post('/pipelines/:pipelineId/chat', async (req, res) => {
       while (agentSwitchCount <= MAX_AGENT_SWITCHES) {
         const result$ = await buildAgentContext({
           agentId: currentAgentId,
+          agentVersionOverride: currentAgentVersion,
           session,
           restoredHistory,
           contextSummary,
@@ -316,6 +324,7 @@ router.post('/pipelines/:pipelineId/chat', async (req, res) => {
         }
 
         currentAgentId = handoff.targetAgentId;
+        currentAgentVersion = handoff.targetAgentVersion ?? null;
       }
 
       // Max switches reached
@@ -456,20 +465,23 @@ router.post('/v1/chat', async (req, res) => {
 
       let session = session_id ? sessionsQ.findById(session_id) : null;
       let currentAgentId: string;
+      let currentAgentVersion: number | null = null;
 
       if (!session) {
-        const entryAgentId = resolveEntryAgent(pipelineFull.flow_data);
-        if (!entryAgentId) {
+        const entry = resolveEntryAgent(pipelineFull.flow_data);
+        if (!entry) {
           sendEvent(res, 'error', { error: 'No entry agent found in pipeline' });
           sendEvent(res, 'done', {});
           res.end();
           return;
         }
-        session = sessionsQ.createPipeline(pipeline.id, entryAgentId);
-        currentAgentId = entryAgentId;
+        session = sessionsQ.createPipeline(pipeline.id, entry.agentId);
+        currentAgentId = entry.agentId;
+        currentAgentVersion = entry.agentVersion;
         await apiKeysQ.incrementSession(apiKey.id);
       } else {
         currentAgentId = session.current_agent_id || session.agent_id;
+        currentAgentVersion = resolveAgentVersion(pipelineFull.flow_data, currentAgentId);
       }
 
       sendEvent(res, 'session', { id: session.id });
@@ -480,6 +492,7 @@ router.post('/v1/chat', async (req, res) => {
       try {
         session = sessionsQ.findById(session.id)!;
         currentAgentId = session.current_agent_id || session.agent_id;
+        currentAgentVersion = resolveAgentVersion(pipelineFull.flow_data, currentAgentId);
 
         let runtimeVariables: Record<string, any> = session.runtime_variables ? { ...session.runtime_variables } : {};
         let restoredHistory: any[] = session.message_history || [];
@@ -497,6 +510,7 @@ router.post('/v1/chat', async (req, res) => {
         while (agentSwitchCount <= MAX_AGENT_SWITCHES) {
           const result$ = await buildAgentContext({
             agentId: currentAgentId,
+            agentVersionOverride: currentAgentVersion,
             session,
             restoredHistory,
             contextSummary,
@@ -565,6 +579,7 @@ router.post('/v1/chat', async (req, res) => {
           }
 
           currentAgentId = handoff.targetAgentId;
+          currentAgentVersion = handoff.targetAgentVersion ?? null;
         }
 
         sendEvent(res, 'done', {});

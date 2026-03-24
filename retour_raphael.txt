@@ -1,0 +1,3 @@
+-deja afficher de la validation client quand tu ecris des tools
+-a lexcation de jamais avoir acce de tools mais que apres une reponse utilisateur et ce que la personne dit(range)
+-pipeline on chosiit les agents indepemdant de leur version il faut declarer quel version de quel agent

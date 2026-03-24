@@ -41,14 +41,17 @@ interface FlowCanvasProps {
 /* ───── Component ───── */
 
 export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: FlowCanvasProps) {
-  /* Build agent definitions with handoffs */
+  /* Build agent definitions with handoffs + versions */
   const availableAgentDefs: AgentDef[] = useMemo(
     () => agents.map((a: any) => {
       const handoffTools = (a.tools || []).filter((t: any) => t.type === 'handoff')
+      const versions = (a.versions || []).map((v: any) => ({ version: v.version, label: v.label || '' }))
       return {
         id: a.id,
         name: a.name,
         handoffs: handoffTools.map((t: any) => ({ toolName: t.name, label: t.name })),
+        versions,
+        currentVersion: a.current_version ?? 1,
       }
     }),
     [agents],
@@ -65,6 +68,7 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'node' | 'edge'; id: string; label: string } | null>(null)
 
   const agentSelectRef = useRef<(nodeId: string, agent: AgentDef) => void>(() => {})
+  const versionSelectRef = useRef<(nodeId: string, version: number, label: string) => void>(() => {})
   const toolSelectRef = useRef<(nodeId: string, name: string) => void>(() => {})
   const isInitialLoad = useRef(true)
 
@@ -99,6 +103,8 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
         }
 
         const agentDef = availableAgentDefs.find((a) => a.id === saved.data?.agentId)
+        const savedVersion = saved.data?.agentVersion ?? agentDef?.currentVersion ?? null
+        const savedVersionLabel = saved.data?.versionLabel || (savedVersion != null ? `v${savedVersion}` : '')
         return {
           id: saved.id,
           type: saved.type,
@@ -106,9 +112,13 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
           data: {
             label: agentDef?.name || saved.data?.label || 'Choisir un agent...',
             agentId: saved.data?.agentId || null,
+            agentVersion: savedVersion,
+            versionLabel: savedVersionLabel,
             handoffs: agentDef?.handoffs || [],
             agents: availableAgentDefs,
+            versions: agentDef?.versions || [],
             onSelect: (agent: AgentDef) => agentSelectRef.current(saved.id, agent),
+            onVersionSelect: (version: number, label: string) => versionSelectRef.current(saved.id, version, label),
           } as PipelineAgentNodeData,
         }
       })
@@ -143,9 +153,13 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
           data: {
             label: 'Choisir un agent...',
             agentId: null,
+            agentVersion: null,
+            versionLabel: '',
             handoffs: [],
             agents: availableAgentDefs,
+            versions: [],
             onSelect: (agent: AgentDef) => agentSelectRef.current('agent-1', agent),
+            onVersionSelect: (version: number, label: string) => versionSelectRef.current('agent-1', version, label),
           } as PipelineAgentNodeData,
         },
       ],
@@ -174,7 +188,7 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
   agentSelectRef.current = (nodeId: string, agent: AgentDef) => {
     setNodes((nds) => nds.map((n) =>
       n.id === nodeId
-        ? { ...n, data: { ...n.data, label: agent.name, agentId: agent.id, handoffs: agent.handoffs } }
+        ? { ...n, data: { ...n.data, label: agent.name, agentId: agent.id, agentVersion: agent.currentVersion, versionLabel: `v${agent.currentVersion}`, handoffs: agent.handoffs, versions: agent.versions } }
         : n,
     ))
     setEdges((eds) => eds.filter((e) => {
@@ -182,6 +196,14 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
       if (!e.sourceHandle || e.sourceHandle === 'default') return true
       return agent.handoffs.some((h) => h.toolName === e.sourceHandle)
     }))
+  }
+
+  versionSelectRef.current = (nodeId: string, version: number, label: string) => {
+    setNodes((nds) => nds.map((n) =>
+      n.id === nodeId
+        ? { ...n, data: { ...n.data, agentVersion: version, versionLabel: label } }
+        : n,
+    ))
   }
 
   toolSelectRef.current = (nodeId: string, name: string) => {
@@ -203,7 +225,11 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
         position: n.position,
         data: {
           label: (n.data as any).label,
-          ...(n.type === 'pipeline-agent' ? { agentId: (n.data as any).agentId } : {}),
+          ...(n.type === 'pipeline-agent' ? {
+            agentId: (n.data as any).agentId,
+            agentVersion: (n.data as any).agentVersion ?? null,
+            versionLabel: (n.data as any).versionLabel ?? '',
+          } : {}),
         },
       }))
       const serializableEdges = edges.map((e) => ({
@@ -220,7 +246,7 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
     (nodeId: string, agent: AgentDef) => {
       setNodes((nds) => nds.map((n) =>
         n.id === nodeId
-          ? { ...n, data: { ...n.data, label: agent.name, agentId: agent.id, handoffs: agent.handoffs } }
+          ? { ...n, data: { ...n.data, label: agent.name, agentId: agent.id, agentVersion: agent.currentVersion, versionLabel: `v${agent.currentVersion}`, handoffs: agent.handoffs, versions: agent.versions } }
           : n,
       ))
       setEdges((eds) => eds.filter((e) => {
@@ -230,6 +256,17 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
       }))
     },
     [setNodes, setEdges],
+  )
+
+  const updateNodeVersion = useCallback(
+    (nodeId: string, version: number, label: string) => {
+      setNodes((nds) => nds.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, agentVersion: version, versionLabel: label } }
+          : n,
+      ))
+    },
+    [setNodes],
   )
 
   const updateToolLabel = useCallback(
@@ -316,13 +353,17 @@ export default function FlowCanvas({ agents, tools, flowData, onFlowChange }: Fl
       data: {
         label: 'Choisir un agent...',
         agentId: null,
+        agentVersion: null,
+        versionLabel: '',
         handoffs: [],
         agents: availableAgentDefs,
+        versions: [],
         onSelect: (agent: AgentDef) => updateNodeAgent(id, agent),
+        onVersionSelect: (version: number, label: string) => updateNodeVersion(id, version, label),
       } as PipelineAgentNodeData,
     }])
     setMenu(null)
-  }, [menu, counter, setNodes, updateNodeAgent, availableAgentDefs])
+  }, [menu, counter, setNodes, updateNodeAgent, updateNodeVersion, availableAgentDefs])
 
   const addToolNode = useCallback(() => {
     if (!menu) return

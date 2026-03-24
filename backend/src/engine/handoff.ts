@@ -33,9 +33,11 @@ export function processHandoff(input: HandoffInput): HandoffOutput {
   const reason = (() => { try { return JSON.parse(toolCallArgs).reason || ''; } catch { return ''; } })();
 
   // Resolve target (pipeline mode only)
-  const targetAgentId = (options?.pipelineFlowData && options?.currentAgentId)
+  const resolved = (options?.pipelineFlowData && options?.currentAgentId)
     ? resolveHandoffTarget(options.pipelineFlowData, options.currentAgentId, tool.name)
     : null;
+  const targetAgentId = resolved?.agentId ?? null;
+  const targetAgentVersion = resolved?.agentVersion ?? null;
 
   const isPipelineInternal = !!(options?.pipelineFlowData && targetAgentId);
   const label = isPipelineInternal
@@ -71,6 +73,7 @@ export function processHandoff(input: HandoffInput): HandoffOutput {
     return {
       handoffResult: {
         targetAgentId: targetAgentId!,
+        targetAgentVersion,
         contextOptions: config.context_options || ['full'],
         transferMessage: config.transfer_message || null,
         pendingHandoff: handoffPayload,

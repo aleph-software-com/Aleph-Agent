@@ -121,9 +121,10 @@ export async function updateVersion(agentId: string, version: number, data: Agen
   if (fields.length === 0) return findVersion(agentId, version);
 
   values.push(agentId, version);
-  const { rows } = await pool.query(
-    `UPDATE agent_versions SET ${fields.join(', ')} WHERE agent_id = $${i++} AND version = $${i} RETURNING *`,
-    values
-  );
+  const agentIdx = i++;
+  const versionIdx = i++;
+  const query = `UPDATE agent_versions SET ${fields.join(', ')} WHERE agent_id = $${agentIdx} AND version = $${versionIdx} RETURNING *`;
+  console.log('[updateVersion] query:', query, 'values count:', values.length);
+  const { rows } = await pool.query(query, values);
   return rows[0] ?? null;
 }

@@ -72,6 +72,7 @@ export interface EngineResult {
   activeTaskName: string | null;
   handoff?: {
     targetAgentId: string;
+    targetAgentVersion: number | null;
     contextOptions: string[];
     transferMessage: string | null;
     pendingHandoff: any;

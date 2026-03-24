@@ -64,6 +64,13 @@ export default function AgentsPage() {
 
   useEffect(() => { loadAgents() }, [loadAgents])
 
+  // Auto-select first agent if none selected
+  useEffect(() => {
+    if (!id && agentsList.length > 0) {
+      navigate(`/agents/${agentsList[0].id}`, { replace: true })
+    }
+  }, [id, agentsList, navigate])
+
   useEffect(() => {
     if (!id) { setAgentFull(null); return }
     api.agents.getFull(id).then(setAgentFull).catch(() => setAgentFull(null))
@@ -121,43 +128,47 @@ export default function AgentsPage() {
 
   const updateAgent = async (data: any) => {
     if (!id || !agentFull) return
-    const snapshotFields = ['description', 'system_prompt', 'llm_provider', 'llm_model', 'llm_config', 'tts_provider', 'tts_model', 'tts_config', 'stt_provider', 'stt_model', 'stt_config', 'flow_data', 'tasks', 'tools']
-    const snapshotUpdate: any = {}
-    const agentUpdate: any = {}
-    for (const [k, v] of Object.entries(data)) {
-      if (snapshotFields.includes(k)) {
-        snapshotUpdate[k] = v
-      } else {
-        agentUpdate[k] = v
+    try {
+      const snapshotFields = ['description', 'system_prompt', 'llm_provider', 'llm_model', 'llm_config', 'tts_provider', 'tts_model', 'tts_config', 'stt_provider', 'stt_model', 'stt_config', 'flow_data', 'tasks', 'tools']
+      const snapshotUpdate: any = {}
+      const agentUpdate: any = {}
+      for (const [k, v] of Object.entries(data)) {
+        if (snapshotFields.includes(k)) {
+          snapshotUpdate[k] = v
+        } else {
+          agentUpdate[k] = v
+        }
       }
-    }
 
-    if (Object.keys(agentUpdate).length > 0) {
-      await api.agents.update(id, agentUpdate)
-    }
-    if (Object.keys(snapshotUpdate).length > 0) {
-      const fullSnapshot = {
-        description: agentFull.description ?? '',
-        system_prompt: agentFull.system_prompt ?? '',
-        llm_provider: agentFull.llm_provider ?? 'openai',
-        llm_model: agentFull.llm_model ?? 'gpt-4o',
-        llm_config: agentFull.llm_config ?? {},
-        tts_provider: agentFull.tts_provider ?? null,
-        tts_model: agentFull.tts_model ?? null,
-        tts_config: agentFull.tts_config ?? {},
-        stt_provider: agentFull.stt_provider ?? null,
-        stt_model: agentFull.stt_model ?? null,
-        stt_config: agentFull.stt_config ?? {},
-        flow_data: agentFull.flow_data ?? { nodes: [], edges: [] },
-        tasks: agentFull.tasks ?? [],
-        tools: agentFull.tools ?? [],
-        ...snapshotUpdate,
+      if (Object.keys(agentUpdate).length > 0) {
+        await api.agents.update(id, agentUpdate)
       }
-      await api.agents.updateVersion(id, agentFull.current_version, { snapshot: fullSnapshot })
+      if (Object.keys(snapshotUpdate).length > 0) {
+        const fullSnapshot = {
+          description: agentFull.description ?? '',
+          system_prompt: agentFull.system_prompt ?? '',
+          llm_provider: agentFull.llm_provider ?? 'openai',
+          llm_model: agentFull.llm_model ?? 'gpt-4o',
+          llm_config: agentFull.llm_config ?? {},
+          tts_provider: agentFull.tts_provider ?? null,
+          tts_model: agentFull.tts_model ?? null,
+          tts_config: agentFull.tts_config ?? {},
+          stt_provider: agentFull.stt_provider ?? null,
+          stt_model: agentFull.stt_model ?? null,
+          stt_config: agentFull.stt_config ?? {},
+          flow_data: agentFull.flow_data ?? { nodes: [], edges: [] },
+          tasks: agentFull.tasks ?? [],
+          tools: agentFull.tools ?? [],
+          ...snapshotUpdate,
+        }
+        await api.agents.updateVersion(id, agentFull.current_version, { snapshot: fullSnapshot })
+      }
+      const newFull = await api.agents.getFull(id)
+      setAgentFull(newFull)
+      loadAgents(agentsSearch)
+    } catch (err) {
+      console.error('[updateAgent] Save failed:', err)
     }
-    const newFull = await api.agents.getFull(id)
-    setAgentFull(newFull)
-    loadAgents(agentsSearch)
   }
 
   const selectedAgent = agentsList.find((a) => a.id === id)

@@ -87,6 +87,15 @@ export async function runAgentLoop(
     ...(lastUserMsg ? [{ role: lastUserMsg.role, content: lastUserMsg.content }] : []),
   ];
 
+  // Tools are only allowed when there's actual user input.
+  // No user message = no tools (the LLM can only produce a text greeting).
+  const hasUserInput = !!lastUserMsg || cleanedHistory.some((m: any) => m.role === 'user');
+  if (!hasUserInput) openaiTools = [];
+
+  // After tool execution, tools are disabled so the LLM must respond in text.
+  // This flag is set after the first tool round to force a text-only follow-up.
+  let toolsConsumed = false;
+
   // ── Context management (window + summary) ──
   const llmConfig = (agent.llm_config || {}) as any;
   // Resolve API key: decrypt from snapshot if present, fallback to .env
@@ -428,7 +437,7 @@ export async function runAgentLoop(
           }
 
           updateTaskSlot(activeTask);
-          openaiTools = buildOpenAITools(activeTask);
+          if (!toolsConsumed) openaiTools = buildOpenAITools(activeTask);
         }
       }
 
@@ -437,7 +446,12 @@ export async function runAgentLoop(
         return buildResult(handoffResult);
       }
 
-      continue; // next iteration — LLM sees tool results
+      // Tools consumed: next iteration the LLM must respond in text only.
+      // One tool round per user turn — the agent cannot chain tools autonomously.
+      toolsConsumed = true;
+      openaiTools = [];
+
+      continue; // next iteration — LLM sees tool results, no tools available
     }
 
     // ── Text response → done ──

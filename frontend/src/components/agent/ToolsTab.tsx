@@ -447,7 +447,7 @@ export default function ToolsTab({ tools, allTools, onUpdateTools }: ToolsTabPro
   const [formError, setFormError] = useState<string | null>(null)
 
   const handleCreate = () => {
-    if (!formName.trim()) return
+    if (!formName.trim()) { setFormError('Please enter a tool name'); return }
     const duplicate = tools.find((t) => t.name === formName.trim())
     if (duplicate) { setFormError(`A tool "${formName.trim()}" already exists`); return }
     setFormError(null)
@@ -468,7 +468,7 @@ export default function ToolsTab({ tools, allTools, onUpdateTools }: ToolsTabPro
     setEditName(tool.name)
     setEditDesc(tool.description || '')
     setEditType(tool.type || 'http')
-    setEditConfig(tool.config || defaultConfigs[tool.type || 'http'])
+    setEditConfig(tool.config || defaultConfigs[(tool.type || 'http') as ToolType])
     setFormOpen(false)
   }
 
@@ -476,7 +476,7 @@ export default function ToolsTab({ tools, allTools, onUpdateTools }: ToolsTabPro
   const [editError, setEditError] = useState<string | null>(null)
 
   const handleSaveEdit = () => {
-    if (!editName.trim() || !editingId) return
+    if (!editName.trim() || !editingId) { setEditError('Please enter a tool name'); return }
     const duplicate = tools.find((t) => t.name === editName.trim() && t.id !== editingId)
     if (duplicate) { setEditError(`A tool "${editName.trim()}" already exists`); return }
     setEditError(null)
