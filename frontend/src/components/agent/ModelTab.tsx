@@ -59,15 +59,6 @@ function VoiceOption({ name, language, selected, onSelect }: {
   )
 }
 
-const voices = [
-  { id: 'alloy', name: 'Alloy', language: 'Neutral — Versatile' },
-  { id: 'echo', name: 'Echo', language: 'Male — Conversational' },
-  { id: 'fable', name: 'Fable', language: 'Neutral — Expressive' },
-  { id: 'onyx', name: 'Onyx', language: 'Male — Deep' },
-  { id: 'nova', name: 'Nova', language: 'Female — Natural' },
-  { id: 'shimmer', name: 'Shimmer', language: 'Female — Clear' },
-]
-
 const llmModelOptions = [
   { value: 'gpt-4o', label: 'GPT-4o' },
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
@@ -78,12 +69,23 @@ const llmModelOptions = [
 ]
 
 const ttsModelOptions = [
-  { value: 'tts-1', label: 'TTS-1' },
-  { value: 'tts-1-hd', label: 'TTS-1 HD' },
+  { value: 'eleven_multilingual_v2', label: 'Multilingual v2', description: 'Best quality — 29 languages' },
+  { value: 'eleven_turbo_v2_5', label: 'Turbo v2.5', description: 'Low latency — 32 languages' },
+  { value: 'eleven_flash_v2_5', label: 'Flash v2.5', description: 'Fastest — real-time' },
+]
+
+const ttsVoices = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', language: 'Female — Conversational' },
+  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', language: 'Female — Calm' },
+  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', language: 'Male — Deep' },
+  { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', language: 'Male — Conversational' },
+  { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', language: 'Female — Clear' },
+  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', language: 'Male — Narrative' },
 ]
 
 const sttModelOptions = [
-  { value: 'whisper-1', label: 'Whisper-1' },
+  { value: 'nova-3', label: 'Nova-3', description: 'Latest — best accuracy' },
+  { value: 'nova-2', label: 'Nova-2', description: 'Stable — low latency' },
 ]
 
 const sttLangOptions = [
@@ -91,6 +93,10 @@ const sttLangOptions = [
   { value: 'fr', label: 'French' },
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'it', label: 'Italian' },
+  { value: 'ar', label: 'Arabic' },
 ]
 
 interface ModelTabProps {
@@ -107,12 +113,15 @@ export default function ModelTab({ agent, onUpdate }: ModelTabProps) {
   const [temperature, setTemperature] = useState(cfg.temperature ?? 0.7)
   const [apiKeyHint, setApiKeyHint] = useState<string | null>(cfg.api_key_hint || null)
 
-  const [ttsModel, setTtsModel] = useState(ttsCfg.model || 'tts-1')
-  const [selectedVoice, setSelectedVoice] = useState(ttsCfg.voice || 'alloy')
-  const [speed, setSpeed] = useState(ttsCfg.speed ?? 1.0)
+  const [ttsEnabled, setTtsEnabled] = useState(!!agent.tts_provider)
+  const [ttsModel, setTtsModel] = useState(ttsCfg.model_id || 'eleven_multilingual_v2')
+  const [selectedVoice, setSelectedVoice] = useState(ttsCfg.voice_id || 'EXAVITQu4vr4xnSDxMaL')
+  const [ttsKeyHint, setTtsKeyHint] = useState<string | null>(ttsCfg.api_key_hint || null)
 
-  const [sttModel, setSttModel] = useState(sttCfg.model || 'whisper-1')
+  const [sttEnabled, setSttEnabled] = useState(!!agent.stt_provider)
+  const [sttModel, setSttModel] = useState(sttCfg.model || 'nova-2')
   const [sttLang, setSttLang] = useState(sttCfg.language || 'multi')
+  const [sttKeyHint, setSttKeyHint] = useState<string | null>(sttCfg.api_key_hint || null)
 
   useEffect(() => {
     const c = agent.llm_config || {}
@@ -121,11 +130,14 @@ export default function ModelTab({ agent, onUpdate }: ModelTabProps) {
     setModel(c.model || 'gpt-4o')
     setTemperature(c.temperature ?? 0.7)
     setApiKeyHint(c.api_key_hint || null)
-    setTtsModel(t.model || 'tts-1')
-    setSelectedVoice(t.voice || 'alloy')
-    setSpeed(t.speed ?? 1.0)
-    setSttModel(s.model || 'whisper-1')
+    setTtsEnabled(!!agent.tts_provider)
+    setTtsModel(t.model_id || 'eleven_multilingual_v2')
+    setSelectedVoice(t.voice_id || 'EXAVITQu4vr4xnSDxMaL')
+    setTtsKeyHint(t.api_key_hint || null)
+    setSttEnabled(!!agent.stt_provider)
+    setSttModel(s.model || 'nova-2')
     setSttLang(s.language || 'multi')
+    setSttKeyHint(s.api_key_hint || null)
   }, [agent.id])
 
   const saveLlm = (patch: Record<string, unknown>) => {
@@ -138,20 +150,36 @@ export default function ModelTab({ agent, onUpdate }: ModelTabProps) {
   }
 
   const saveTts = (patch: Record<string, unknown>) => {
-    const updated = { provider: 'openai', model: ttsModel, voice: selectedVoice, speed, ...patch }
+    const updated = { provider: 'elevenlabs', model_id: ttsModel, voice_id: selectedVoice, ...patch }
     onUpdate({
       tts_config: updated,
-      tts_provider: 'openai',
-      tts_model: (patch.model as string) || ttsModel,
+      tts_provider: 'elevenlabs',
+      tts_model: (patch.voice_id as string) || selectedVoice,
+    })
+  }
+
+  const disableTts = () => {
+    onUpdate({
+      tts_config: {},
+      tts_provider: null,
+      tts_model: null,
     })
   }
 
   const saveStt = (patch: Record<string, unknown>) => {
-    const updated = { provider: 'openai', model: sttModel, language: sttLang, ...patch }
+    const updated = { provider: 'deepgram', model: sttModel, language: sttLang, ...patch }
     onUpdate({
       stt_config: updated,
-      stt_provider: 'openai',
+      stt_provider: 'deepgram',
       stt_model: (patch.model as string) || sttModel,
+    })
+  }
+
+  const disableStt = () => {
+    onUpdate({
+      stt_config: {},
+      stt_provider: null,
+      stt_model: null,
     })
   }
 
@@ -201,81 +229,151 @@ export default function ModelTab({ agent, onUpdate }: ModelTabProps) {
 
       {/* TTS */}
       <Section
-        title="Model Text-to-Speech"
+        title="Text-to-Speech"
         action={
-          <span className="text-[11px] font-medium tracking-wide uppercase px-2.5 py-1 rounded-full" style={{ background: 'var(--bg-light)', color: 'var(--highlight)', border: '1px solid var(--border-muted)' }}>
-            Coming Soon
-          </span>
+          <div className="flex items-center gap-2">
+            {ttsEnabled && (
+              <ProviderKeySelector
+                hint={ttsKeyHint}
+                onSave={(encrypted, hint) => {
+                  setTtsKeyHint(hint)
+                  saveTts({ api_key_encrypted: encrypted, api_key_hint: hint })
+                }}
+                onRemove={() => {
+                  setTtsKeyHint(null)
+                  saveTts({ api_key_encrypted: null, api_key_hint: null })
+                }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !ttsEnabled
+                setTtsEnabled(next)
+                if (next) saveTts({})
+                else disableTts()
+              }}
+              className="relative w-9 h-5 rounded-full transition-all duration-200 cursor-pointer"
+              style={{
+                background: ttsEnabled ? 'var(--primary)' : 'var(--bg-light)',
+                border: `1px solid ${ttsEnabled ? 'var(--primary)' : 'var(--border-muted)'}`,
+              }}
+            >
+              <div
+                className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all duration-200"
+                style={{
+                  background: ttsEnabled ? 'var(--bg-dark)' : 'var(--highlight)',
+                  left: ttsEnabled ? 18 : 3,
+                }}
+              />
+            </button>
+          </div>
         }
       >
-        <div style={{ opacity: 0.4, pointerEvents: 'none', userSelect: 'none' }}>
-          <div className="grid grid-cols-2 gap-4">
+        {ttsEnabled ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--bg-light)', border: '1px solid var(--border-muted)' }}>
+              <span className="text-[12px] font-medium" style={{ color: 'var(--highlight)' }}>Provider</span>
+              <span className="text-[12px] font-semibold" style={{ color: 'var(--text)' }}>ElevenLabs</span>
+            </div>
             <Field label="Model">
               <Dropdown
                 options={ttsModelOptions}
                 value={ttsModel}
-                onChange={() => {}}
+                onChange={(v) => { setTtsModel(v); saveTts({ model_id: v }) }}
               />
             </Field>
-            <Field label="Speed">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range" min="0.5" max="2" step="0.1" value={speed}
-                  readOnly
-                  className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${((speed - 0.5) / 1.5) * 100}%, var(--bg-light) ${((speed - 0.5) / 1.5) * 100}%, var(--bg-light) 100%)`,
-                    border: 'none', padding: 0,
-                  }}
-                />
-                <span className="text-[13px] font-mono font-medium w-10 text-right" style={{ color: 'var(--primary)' }}>
-                  {speed.toFixed(1)}x
-                </span>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>Voice</label>
+              <div className="grid grid-cols-2 gap-2">
+                {ttsVoices.map((voice) => (
+                  <VoiceOption
+                    key={voice.id} name={voice.name} language={voice.language}
+                    selected={selectedVoice === voice.id}
+                    onSelect={() => { setSelectedVoice(voice.id); saveTts({ voice_id: voice.id }) }}
+                  />
+                ))}
               </div>
-            </Field>
-          </div>
-          <div className="flex flex-col gap-1.5 mt-5">
-            <label className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>Voice</label>
-            <div className="grid grid-cols-2 gap-2">
-              {voices.map((voice) => (
-                <VoiceOption
-                  key={voice.id} name={voice.name} language={voice.language}
-                  selected={selectedVoice === voice.id}
-                  onSelect={() => {}}
-                />
-              ))}
             </div>
           </div>
-        </div>
+        ) : (
+          <p className="text-[12px] py-2" style={{ color: 'var(--highlight)' }}>
+            Enable to add voice output to this agent. Uses ElevenLabs for speech synthesis.
+          </p>
+        )}
       </Section>
 
       {/* STT */}
       <Section
-        title="Model Speech-to-Text"
+        title="Speech-to-Text"
         action={
-          <span className="text-[11px] font-medium tracking-wide uppercase px-2.5 py-1 rounded-full" style={{ background: 'var(--bg-light)', color: 'var(--highlight)', border: '1px solid var(--border-muted)' }}>
-            Coming Soon
-          </span>
+          <div className="flex items-center gap-2">
+            {sttEnabled && (
+              <ProviderKeySelector
+                hint={sttKeyHint}
+                onSave={(encrypted, hint) => {
+                  setSttKeyHint(hint)
+                  saveStt({ api_key_encrypted: encrypted, api_key_hint: hint })
+                }}
+                onRemove={() => {
+                  setSttKeyHint(null)
+                  saveStt({ api_key_encrypted: null, api_key_hint: null })
+                }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !sttEnabled
+                setSttEnabled(next)
+                if (next) saveStt({})
+                else disableStt()
+              }}
+              className="relative w-9 h-5 rounded-full transition-all duration-200 cursor-pointer"
+              style={{
+                background: sttEnabled ? 'var(--primary)' : 'var(--bg-light)',
+                border: `1px solid ${sttEnabled ? 'var(--primary)' : 'var(--border-muted)'}`,
+              }}
+            >
+              <div
+                className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all duration-200"
+                style={{
+                  background: sttEnabled ? 'var(--bg-dark)' : 'var(--highlight)',
+                  left: sttEnabled ? 18 : 3,
+                }}
+              />
+            </button>
+          </div>
         }
       >
-        <div style={{ opacity: 0.4, pointerEvents: 'none', userSelect: 'none' }}>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Model">
-              <Dropdown
-                options={sttModelOptions}
-                value={sttModel}
-                onChange={() => {}}
-              />
-            </Field>
-            <Field label="Language">
-              <Dropdown
-                options={sttLangOptions}
-                value={sttLang}
-                onChange={() => {}}
-              />
-            </Field>
+        {sttEnabled ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--bg-light)', border: '1px solid var(--border-muted)' }}>
+              <span className="text-[12px] font-medium" style={{ color: 'var(--highlight)' }}>Provider</span>
+              <span className="text-[12px] font-semibold" style={{ color: 'var(--text)' }}>Deepgram</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Model">
+                <Dropdown
+                  options={sttModelOptions}
+                  value={sttModel}
+                  onChange={(v) => { setSttModel(v); saveStt({ model: v }) }}
+                />
+              </Field>
+              <Field label="Language">
+                <Dropdown
+                  options={sttLangOptions}
+                  value={sttLang}
+                  onChange={(v) => { setSttLang(v); saveStt({ language: v }) }}
+                />
+              </Field>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="text-[12px] py-2" style={{ color: 'var(--highlight)' }}>
+            Enable to add voice input to this agent. Uses Deepgram for transcription and Silero VAD for turn detection.
+          </p>
+        )}
       </Section>
     </div>
   )

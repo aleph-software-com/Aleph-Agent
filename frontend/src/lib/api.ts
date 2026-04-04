@@ -30,7 +30,6 @@ export const agents = {
   create: (data: any) => request<any>('/agents', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: any) => request<any>(`/agents/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) => request<void>(`/agents/${id}`, { method: 'DELETE' }),
-  // Versions
   getVersions: (id: string) => request<any[]>(`/agents/${id}/versions`),
   getVersion: (id: string, version: number) => request<any>(`/agents/${id}/versions/${version}`),
   createVersion: (id: string, data: any) => request<any>(`/agents/${id}/versions`, { method: 'POST', body: JSON.stringify(data) }),
@@ -55,7 +54,6 @@ export const pipelines = {
   create: (data: any) => request<any>('/pipelines', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: any) => request<any>(`/pipelines/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) => request<void>(`/pipelines/${id}`, { method: 'DELETE' }),
-  // Versions
   getVersions: (id: string) => request<any[]>(`/pipelines/${id}/versions`),
   getVersion: (id: string, version: number) => request<any>(`/pipelines/${id}/versions/${version}`),
   createVersion: (id: string, data: any) => request<any>(`/pipelines/${id}/versions`, { method: 'POST', body: JSON.stringify(data) }),
@@ -83,7 +81,7 @@ export const apiKeys = {
 };
 
 // ────────────────────────────────────────
-// Crypto (encrypt API keys server-side)
+// Crypto
 // ────────────────────────────────────────
 export const crypto = {
   encryptKey: (key: string) =>
@@ -94,81 +92,8 @@ export const crypto = {
 };
 
 // ────────────────────────────────────────
-// SSE streaming (shared)
-// ────────────────────────────────────────
-async function streamSSE(
-  url: string,
-  messages: { role: string; content: string }[] | null,
-  sessionId: string | null,
-  onEvent: (event: string, data: any) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  const reqBody: Record<string, any> = {};
-  if (messages) reqBody.messages = messages;
-  if (sessionId) reqBody.session_id = sessionId;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(reqBody),
-    signal,
-  });
-
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `HTTP ${res.status}`);
-  }
-
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      let currentEvent = '';
-      for (const line of lines) {
-        if (line.startsWith('event: ')) {
-          currentEvent = line.slice(7);
-        } else if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            onEvent(currentEvent, data);
-          } catch { /* skip malformed */ }
-        }
-      }
-    }
-  } catch (err: any) {
-    if (err.name === 'AbortError') return;
-    throw err;
-  }
-}
-
-// ────────────────────────────────────────
 // Sessions
 // ────────────────────────────────────────
 export const sessions = {
   remove: (id: string) => request<void>(`/sessions/${id}`, { method: 'DELETE' }),
-};
-
-// ────────────────────────────────────────
-// Chat (SSE streaming)
-// ────────────────────────────────────────
-export const chat = {
-  stream: (agentId: string, messages: { role: string; content: string }[] | null, sessionId: string | null, onEvent: (event: string, data: any) => void, signal?: AbortSignal) =>
-    streamSSE(`${BASE}/agents/${agentId}/chat`, messages, sessionId, onEvent, signal),
-};
-
-// ────────────────────────────────────────
-// Pipeline Chat (SSE streaming)
-// ────────────────────────────────────────
-export const pipelineChat = {
-  stream: (pipelineId: string, messages: { role: string; content: string }[] | null, sessionId: string | null, onEvent: (event: string, data: any) => void, signal?: AbortSignal) =>
-    streamSSE(`${BASE}/pipelines/${pipelineId}/chat`, messages, sessionId, onEvent, signal),
 };
