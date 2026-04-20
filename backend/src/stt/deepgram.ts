@@ -26,6 +26,7 @@ export class DeepgramSTT extends EventEmitter {
   private readonly endpointing: number;
   private readonly sampleRate: number;
   private readonly channels: number;
+  private readonly encoding: string;
 
   constructor(config: DeepgramConfig) {
     super();
@@ -35,6 +36,7 @@ export class DeepgramSTT extends EventEmitter {
     this.endpointing = config.endpointing ?? 25;
     this.sampleRate = config.sampleRate ?? 16000;
     this.channels = config.channels ?? 1;
+    this.encoding = config.encoding ?? 'linear16';
   }
 
   // ── Lifecycle ─────────────────────────────────────────
@@ -45,7 +47,7 @@ export class DeepgramSTT extends EventEmitter {
       endpointing: String(this.endpointing),
       smart_format: 'false',
       interim_results: 'false',
-      encoding: 'linear16',
+      encoding: this.encoding,
       sample_rate: String(this.sampleRate),
       channels: String(this.channels),
       punctuate: 'false',
@@ -69,7 +71,7 @@ export class DeepgramSTT extends EventEmitter {
     this.ws.on('open', () => {
       this.connected = true;
       this.startKeepAlive();
-      console.log(`[Deepgram] Connected — model=${this.model} lang=${this.language} endpointing=${this.endpointing}ms`);
+      console.log(`[Deepgram] Connected — model=${this.model} lang=${this.language} encoding=${this.encoding} sampleRate=${this.sampleRate} endpointing=${this.endpointing}ms`);
       this.emit('open');
     });
 
@@ -79,6 +81,7 @@ export class DeepgramSTT extends EventEmitter {
 
         if (msg.type === 'Results') {
           const alt = msg.channel?.alternatives?.[0];
+          console.log(`[DEBUG][Deepgram] Results — is_final=${msg.is_final} transcript="${alt?.transcript ?? ''}"`);
           if (alt && alt.transcript) {
             const result: TranscriptResult = {
               transcript: alt.transcript,
@@ -87,9 +90,15 @@ export class DeepgramSTT extends EventEmitter {
             this.emit('transcript', result);
           }
         } else if (msg.type === 'UtteranceEnd') {
+          console.log(`[DEBUG][Deepgram] UtteranceEnd received`);
           this.emit('utterance_end');
         } else if (msg.type === 'SpeechStarted') {
+          console.log(`[DEBUG][Deepgram] SpeechStarted received`);
           this.emit('deepgram_speech_started');
+        } else if (msg.type === 'Metadata') {
+          console.log(`[DEBUG][Deepgram] Metadata:`, JSON.stringify(msg));
+        } else if (msg.type === 'Error') {
+          console.error(`[DEBUG][Deepgram] Error from server:`, JSON.stringify(msg));
         }
       } catch {
         // Ignore malformed messages
@@ -119,9 +128,17 @@ export class DeepgramSTT extends EventEmitter {
   }
 
   /** Send raw PCM16 audio to Deepgram. */
+  private _sendCount = 0;
   send(pcmChunk: Buffer): void {
     if (this.ws && this.connected && this.ws.readyState === WebSocket.OPEN) {
+      this._sendCount++;
+      if (this._sendCount === 1 || this._sendCount % 200 === 0)
+        console.log(`[DEBUG][Deepgram] Sending chunk #${this._sendCount} — ${pcmChunk.length} bytes`);
       this.ws.send(pcmChunk);
+    } else {
+      if (this._sendCount === 0 || this._sendCount % 50 === 0)
+        console.warn(`[DEBUG][Deepgram] send() called but NOT connected — connected=${this.connected} readyState=${this.ws?.readyState}`);
+      this._sendCount++;
     }
   }
 
